@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Luxta Academy - Web2</title>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<style>
+  body {
+    background:#111; color:white;
+    display:flex; align-items:center; justify-content:center;
+    height:100vh; font-size:20px;
+    font-family: monospace;
+  }
+</style>
+</head>
+<body>
+  <p id="status">Đang kiểm tra...</p>
+
+<script>
+  // --- FIX: firebaseConfig phải dùng dấu "," thay vì ":" ---
+  const firebaseConfig = {
+    apiKey: "AIzaSyAdcnGkIUmq3Fbz98cUefdh68Wp0tCdl_E",
+    authDomain: "luxta-a2418.firebaseapp.com",
+    databaseURL: "https://luxta-a2418-default-rtdb.firebaseio.com/",
+    projectId: "luxta-a2418",
+    storageBucket: "luxta-a2418.firebasestorage.app",
+    messagingSenderId: "466332578735",
+    appId: "1:466332578735:android:5ededdc3cd2d4b325cb55a"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  // --- lấy từ localStorage ---
+  const uid = localStorage.getItem("luxta_userid");
+  const linkId = localStorage.getItem("luxta_linkid");
+  const startTime = parseInt(localStorage.getItem("luxta_startTime") || "0");
+
+  if (!uid || !linkId) {
+    document.getElementById("status").innerText = "Thiếu thông tin (UID/LinkID).";
+    return killPage();
+  }
+
+  const today = new Date().toISOString().slice(0,10);
+  const userLinkRef = db.ref(`users/${uid}/links/${linkId}`);
+  const coinRef = db.ref(`users/${uid}/coins`);
+
+  const delay = Math.random() * (3000 - 1500) + 1500;
+  setTimeout(processLink, delay);
+
+  function processLink() {
+    userLinkRef.get().then(snapshot => {
+      let data = snapshot.val();
+      let countToday = 0;
+
+      if (data && data.date === today) countToday = data.count || 0;
+      if (countToday >= 2) {
+        document.getElementById("status").innerText = "Link đã hoàn thành hôm nay.";
+        return killPage();
+      }
+
+      const newCount = countToday + 1;
+      userLinkRef.set({ date: today, count: newCount });
+
+      const now = Date.now();
+      const passed = now - startTime;
+
+      // --- nếu dưới 40s thì trừ coin ---
+      if (passed < 40000) {
+        document.getElementById("status").innerText = "Đã hoàn thành!";
+
+        coinRef.get().then(snap => {
+          const current = snap.val() || 0;
+          const newCoin = Math.max(0, current - 60);
+          coinRef.set(newCoin);
+        });
+
+        return setTimeout(killPage, 1200);
+      }
+
+      // --- nếu đủ thời gian thì cộng coin ---
+      coinRef.get().then(snap => {
+        const current = snap.val() || 0;
+        coinRef.set(current + 30);
+      });
+
+      document.getElementById("status").innerText = "Đã hoàn thành!";
+      setTimeout(killPage, 1200);
+    });
+  }
+
+  function killPage() {
+    localStorage.removeItem("luxta_userid");
+    localStorage.removeItem("luxta_linkid");
+    localStorage.removeItem("luxta_startTime");
+
+    if (window.ReactNativeWebView) {
+      window.ReactNativeWebView.postMessage("close");
+    }
+    window.close();
+  }
+</script>
+</body>
+</html>
