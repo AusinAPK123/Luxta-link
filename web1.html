@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Luxta Academy - Link</title>
 
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
 <style>
   @font-face { font-family: 'PixelFont'; src: url('pixil.otf') format('opentype'); }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -43,42 +46,62 @@ const url = new URL(location.href);
 const uid = url.searchParams.get("uid");
 const linkId = url.searchParams.get("link") || "1";
 
-// --- kiểm tra UID hợp lệ ---
 if (!uid || uid.trim() === "") {
   alert("Không tìm thấy UID. Mở từ trong app!");
   throw new Error("Missing UID");
 }
 
-// --- lưu UID + LinkID + startTime ---
-localStorage.setItem("luxta_userid", uid);
-localStorage.setItem("luxta_linkid", linkId);
-localStorage.setItem("luxta_startTime", Date.now());
+// --- Firebase config ---
+const firebaseConfig = {
+  apiKey: "AIzaSyAdcnGkIUmq3Fbz98cUefdh68Wp0tCdl_E",
+  authDomain: "luxta-a2418.firebaseapp.com",
+  databaseURL: "https://luxta-a2418-default-rtdb.firebaseio.com/",
+  projectId: "luxta-a2418",
+  storageBucket: "luxta-a2418.firebasestorage.app",
+  messagingSenderId: "466332578735",
+  appId: "1:466332578735:android:5ededdc3cd2d4b325cb55a"
+};
 
-// --- debug ---
-console.log("UID:", uid, "LinkID:", linkId, "StartTime:", localStorage.getItem("luxta_startTime"));
-
-// --- hiển thị link ---
-document.getElementById("l_name").textContent = "Link " + linkId;
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
 // --- UI ---
+document.getElementById("l_name").textContent = "Link " + linkId;
 const progressBar = document.querySelector("progress");
 const countText = document.getElementById("count");
 const startBtn = document.querySelector(".start");
 const today = new Date().toDateString();
+
 let saved = JSON.parse(localStorage.getItem("luxta_linkdata") || "{}");
 if (!saved[linkId] || saved[linkId].date !== today) saved[linkId] = { date: today, count: 0 };
 updateUI();
 
-startBtn.addEventListener("click", () => {
+startBtn.addEventListener("click", async () => {
   if (saved[linkId].count >= 2) {
     alert("Hôm nay bạn đã vượt đủ 2 lần của link này.");
     return;
   }
 
+  // --- Tạo session token ---
+  const token = crypto.randomUUID();
+  const now = Date.now();
+  await db.ref("sessions/" + token).set({
+    uid,
+    link: linkId,
+    startAt: now,
+    expireAt: now + 40000,
+    used: false
+  });
+
+  // --- lưu token vào localStorage ---
+  localStorage.setItem("luxta_token", token);
+
+  // --- update UI ---
   saved[linkId].count++;
   localStorage.setItem("luxta_linkdata", JSON.stringify(saved));
   updateUI();
 
+  // --- redirect ---
   let link4mMap = {
     "1": "https://link4m.com/1Vsz3xRi",
     "2": "https://link4m.com/ZQlmO1n3",
@@ -102,8 +125,8 @@ startBtn.addEventListener("click", () => {
     "20": "https://link4m.com/Q7BrN"
   };
 
-  let targetLink = link4mMap[linkId] || "https://link4m.co/default";
-  setTimeout(() => { window.location.href = targetLink; }, 800);
+  const targetLink = link4mMap[linkId] || "https://link4m.co/default";
+  setTimeout(() => { window.location.href = targetLink + "?token=" + token; }, 800);
 });
 
 function updateUI() {
