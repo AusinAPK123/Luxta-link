@@ -42,7 +42,6 @@
 
   if (!uid || !linkId) {
     document.getElementById("status").innerText = "Thiếu thông tin (UID/LinkID).";
-    return killPage();
   }
 
   const today = new Date().toISOString().slice(0,10);
@@ -60,7 +59,6 @@
       if (data && data.date === today) countToday = data.count || 0;
       if (countToday >= 2) {
         document.getElementById("status").innerText = "Link đã hoàn thành hôm nay.";
-        return killPage();
       }
 
       const newCount = countToday + 1;
@@ -78,8 +76,6 @@
           const newCoin = Math.max(0, current - 60);
           coinRef.set(newCoin);
         });
-
-        return setTimeout(killPage, 1200);
       }
 
       // --- nếu đủ thời gian thì cộng coin ---
@@ -89,7 +85,6 @@
       });
 
       document.getElementById("status").innerText = "Đã hoàn thành!";
-      setTimeout(killPage, 1200);
     });
   }
 
