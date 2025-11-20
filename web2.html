@@ -76,8 +76,11 @@ async function processToken() {
     coinChange = 30;
   }
 
-  // --- đánh dấu token đã dùng ---
-  await tokenRef.update({ used: true });
+  // --- đánh dấu token đã dùng và gắn tg xoá ---
+  await tokenRef.update({ 
+    used: true,
+    deleteAt: now + 6*60*60*1000 // xoá sau 6 giờ
+  });
 
   // --- cập nhật số lần link ---
   const linkSnap = await userLinkRef.get();
