@@ -38,78 +38,164 @@
 
 <p class="cre">Created and managed by Luxta Academy</p>
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getDatabase, ref, get, onValue } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+// --- Firebase config (giữ nguyên của bạn) ---
+const firebaseConfig = {
+  apiKey: "AIzaSyAdcnGkIUmq3Fbz98cUefdh68Wp0tCdl_E",
+  authDomain: "luxta-a2418.firebaseapp.com",
+  databaseURL: "https://luxta-a2418-default-rtdb.firebaseio.com",
+  projectId: "luxta-a2418",
+  storageBucket: "luxta-a2418.firebasestorage.app",
+  messagingSenderId: "466332578735",
+  appId: "1:466332578735:android:5ededdc3cd2d4b325cb55a"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// --- Lấy uid + link từ URL ---
 const url = new URL(location.href);
 const uid = url.searchParams.get("uid");
 const linkId = url.searchParams.get("link") || "1";
 
-// --- kiểm tra UID hợp lệ ---
-if (!uid || uid.trim() === "") {
+if (!uid || !uid.trim()) {
   alert("Không tìm thấy UID. Mở từ trong app!");
   throw new Error("Missing UID");
 }
 
-// --- lưu UID + LinkID + startTime ---
+// --- UI elements ---
+const lNameEl = document.getElementById("l_name");
+const countText = document.getElementById("count");
+const progressBar = document.querySelector("progress");
+const startBtn = document.querySelector(".start");
+
+// --- hiển thị tên link ---
+lNameEl.textContent = "Link " + linkId;
+
+// --- lưu local (vẫn giữ startTime để debug nếu cần) ---
 localStorage.setItem("luxta_userid", uid);
 localStorage.setItem("luxta_linkid", linkId);
 localStorage.setItem("luxta_startTime", Date.now());
 
-// --- debug ---
-console.log("UID:", uid, "LinkID:", linkId, "StartTime:", localStorage.getItem("luxta_startTime"));
+// --- map link (giữ như cũ) ---
+const link4mMap = {
+  "1": "https://link4m.com/NM0ghGn",
+  "2": "https://link4m.com/rkjy6Yko",
+  "3": "https://link4m.com/iwARQo",
+  "4": "https://link4m.com/ePGuQa",
+  "5": "https://link4m.com/08YN5p",
+  "6": "https://link4m.com/IxrZI",
+  "7": "https://link4m.com/CBxE3",
+  "8": "https://link4m.com/YJF4VzkF",
+  "9": "https://link4m.com/yhwKv",
+  "10": "https://link4m.com/2bpdrEPA",
+  "11": "https://link4m.com/Sd9oG",
+  "12": "https://link4m.com/wU1RFyQ",
+  "13": "https://link4m.com/xUUNWw3",
+  "14": "https://link4m.com/LSMX1",
+  "15": "https://link4m.com/HVx0keIk",
+  "16": "https://link4m.com/dRnCo",
+  "17": "https://link4m.com/SdIWL2U",
+  "18": "https://link4m.com/WcPjBVls",
+  "19": "https://link4m.com/xjFoz",
+  "20": "https://link4m.com/obRsm"
+};
+const defaultTarget = "https://link4m.co/default";
+const targetLink = link4mMap[linkId] || defaultTarget;
 
-// --- hiển thị link ---
-document.getElementById("l_name").textContent = "Link " + linkId;
+// --- helper ngày ---
+function todayISO() {
+  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+}
 
-// --- UI ---
-const progressBar = document.querySelector("progress");
-const countText = document.getElementById("count");
-const startBtn = document.querySelector(".start");
-const today = new Date().toDateString();
-let saved = JSON.parse(localStorage.getItem("luxta_linkdata") || "{}");
-if (!saved[linkId] || saved[linkId].date !== today) saved[linkId] = { date: today, count: 0 };
-updateUI();
+// --- Hiển thị từ localStorage (fallback) ---
+function loadLocalFallback() {
+  const saved = JSON.parse(localStorage.getItem("luxta_linkdata") || "{}");
+  const today = new Date().toDateString();
+  const s = saved[linkId];
+  let cnt = 0;
+  if (s && s.date === today) cnt = s.count || 0;
+  progressBar.value = cnt;
+  countText.textContent = `${cnt}/2`;
+  startBtn.disabled = cnt >= 2;
+  startBtn.style.opacity = cnt >= 2 ? "0.6" : "1";
+}
 
+// --- Lắng nghe dữ liệu từ Firebase cho link cụ thể ---
+const linkRef = ref(db, `users/${uid}/links/${linkId}`);
+let lastKnown = { count: 0, date: null };
+
+async function initialLoad() {
+  try {
+    const snap = await get(linkRef);
+    if (!snap.exists()) {
+      // không có trên DB -> fallback local
+      loadLocalFallback();
+      return;
+    }
+    const data = snap.val() || {};
+    const dbDate = data.date || null;
+    const dbCount = data.count ?? 0;
+
+    // Nếu date khác ngày hôm nay => coi như 0 (chưa vượt hôm nay)
+    const cnt = dbDate === todayISO() ? dbCount : 0;
+    lastKnown = { count: cnt, date: dbDate };
+
+    progressBar.value = cnt;
+    countText.textContent = `${cnt}/2`;
+    startBtn.disabled = cnt >= 2;
+    startBtn.style.opacity = cnt >= 2 ? "0.6" : "1";
+  } catch (e) {
+    console.warn("Lấy dữ liệu Firebase thất bại, dùng local fallback", e);
+    loadLocalFallback();
+  }
+}
+
+// realtime update (nếu DB thay đổi sẽ cập nhật UI ngay)
+onValue(linkRef, snapshot => {
+  if (!snapshot.exists()) {
+    // Nếu không có -> fallback
+    loadLocalFallback();
+    return;
+  }
+  const data = snapshot.val() || {};
+  const dbDate = data.date || null;
+  const dbCount = data.count ?? 0;
+  const cnt = dbDate === todayISO() ? dbCount : 0;
+
+  lastKnown = { count: cnt, date: dbDate };
+  progressBar.value = cnt;
+  countText.textContent = `${cnt}/2`;
+  startBtn.disabled = cnt >= 2;
+  startBtn.style.opacity = cnt >= 2 ? "0.6" : "1";
+}, err => {
+  // nếu lỗi realtime, giữ fallback
+  console.warn("Realtime error:", err);
+  loadLocalFallback();
+});
+
+// gọi lần đầu
+initialLoad();
+
+// --- khi nhấn Bắt đầu ---
+// KHÔNG cập nhật DB ở đây (web2 sẽ xử lý khi token được redeem).
 startBtn.addEventListener("click", () => {
-  if (saved[linkId].count >= 2) {
+  // kiểm tra lại local/lastKnown trước khi mở (tránh race)
+  const cnt = lastKnown.count ?? 0;
+  if (cnt >= 2) {
     alert("Hôm nay bạn đã vượt đủ 2 lần của link này.");
     return;
   }
 
-  saved[linkId].count++;
-  localStorage.setItem("luxta_linkdata", JSON.stringify(saved));
-  updateUI();
-
-  let link4mMap = {
-    "1": "https://link4m.com/1Vsz3xRi",
-    "2": "https://link4m.com/ZQlmO1n3",
-    "3": "https://link4m.com/TPCkWBGi",
-    "4": "https://link4m.com/NVkn5Dau",
-    "5": "https://link4m.com/YKHQL",
-    "6": "https://link4m.com/q7TqCk6",
-    "7": "https://link4m.com/DxmpJ",
-    "8": "https://link4m.com/aL0DVES",
-    "9": "https://link4m.com/GLByKUo",
-    "10": "https://link4m.com/parIcS",
-    "11": "https://link4m.com/iuvJntY",
-    "12": "https://link4m.com/LhvuriKb",
-    "13": "https://link4m.com/qzSsMWck",
-    "14": "https://link4m.com/CE3WRh",
-    "15": "https://link4m.com/1FovR",
-    "16": "https://link4m.com/r8Q3QYW",
-    "17": "https://link4m.com/Jrj7X",
-    "18": "https://link4m.com/HQZYVO",
-    "19": "https://link4m.com/cPt88",
-    "20": "https://link4m.com/Q7BrN"
-  };
-
-  let targetLink = link4mMap[linkId] || "https://link4m.co/default";
-  setTimeout(() => { window.location.href = targetLink; }, 800);
+  // mở link (không thay đổi DB)
+  // giữ localStorage startTime + mở
+  localStorage.setItem("luxta_last_open", Date.now());
+  // mở trong tab mới (app có thể dùng postMessage để nhận close)
+  window.open(targetLink, "_blank");
 });
-
-function updateUI() {
-  progressBar.value = saved[linkId].count;
-  countText.textContent = `${saved[linkId].count}/2`;
-}
 </script>
 </body>
 </html>
