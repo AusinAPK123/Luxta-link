@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Luxta Academy - Web2</title>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<style>
+  @font-face {
+    font-family: 'Pixil';
+    src: url('Pixil.otf') format('opentype');
+  }
+  
+  body {
+    background:#111; color:white;
+    display:flex; align-items:center; justify-content:center;
+    height:100vh; font-size:20px;
+    font-family: 'Pixil', monospace;
+  }
+</style>
+</head>
+<body>
+  <p id="status">Đang kiểm tra...</p>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAdcnGkIUmq3Fbz98cUefdh68Wp0tCdl_E",
+  authDomain: "luxta-a2418.firebaseapp.com",
+  databaseURL: "https://luxta-a2418-default-rtdb.firebaseio.com/",
+  projectId: "luxta-a2418",
+  storageBucket: "luxta-a2418.firebasestorage.app",
+  messagingSenderId: "466332578735",
+  appId: "1:466332578735:android:5ededdc3cd2d4b325cb55a"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// --- lấy token từ URL hoặc localStorage ---
+const urlParams = new URLSearchParams(window.location.search);
+const token = urlParams.get("token") || localStorage.getItem("luxta_token");
+if (!token) {
+  document.getElementById("status").innerText = "Token không hợp lệ.";
+  throw new Error("Missing token");
+}
+
+// --- delay nhỏ để random giống cũ ---
+const delay = Math.random() * (3000 - 1500) + 1500;
+setTimeout(processToken, delay);
+
+async function processToken() {
+  const tokenRef = db.ref(`sessions/${token}`);
+  const snap = await tokenRef.get();
+  const session = snap.val();
+
+  if (!session) {
+    document.getElementById("status").innerText = "Token không tồn tại.";
+    return;
+  }
+
+  if (session.used) {
+    document.getElementById("status").innerText = "Token đã sử dụng.";
+    return;
+  }
+
+  const now = Date.now();
+  const uid = session.uid;
+  const linkId = session.link;
+  const userLinkRef = db.ref(`users/${uid}/links/${linkId}`);
+  const coinRef = db.ref(`users/${uid}/coins`);
+
+  // --- kiểm tra thời gian ---
+  let coinChange = 0;
+  if (now < session.expireAt) {
+    // quá nhanh, trừ coin
+    coinChange = -60;
+  } else {
+    coinChange = 30;
+  }
+
+  // --- đánh dấu token đã dùng và gắn tg xoá ---
+  await tokenRef.update({ 
+    used: true,
+    deleteAt: now + 6*60*60*1000 // xoá sau 6 giờ
+  });
+
+  // --- cập nhật số lần link ---
+  const linkSnap = await userLinkRef.get();
+  const today = new Date().toISOString().slice(0,10);
+  let countToday = 0;
+  if (linkSnap.exists() && linkSnap.val().date === today) countToday = linkSnap.val().count || 0;
+  await userLinkRef.set({ date: today, count: countToday + 1 });
+
+    // --- cập nhật coin và xp ---
+  const coinSnap = await coinRef.get();
+  const currentCoin = coinSnap.val() || 0;
+  
+  if (coinChange > 0) {
+    // token hợp lệ, cộng coin
+    await coinRef.set(currentCoin + coinChange);
+  
+    // --- xử lý XP ---
+    const xpRef = db.ref(`users/${uid}/xp`);
+    const lvRef = db.ref(`users/${uid}/level`);
+    const xpSnap = await xpRef.get();
+    const levelSnap = await lvRef.get();
+  
+    let currentXp = xpSnap.val() || 0;
+    let level = levelSnap.val() || 0;
+  
+    // mảng XP mỗi cấp từ 0→1, 1→2, ..., 14→15
+    const levelXP = [100,150,200,250,300,350,400,450,500,550,600,650,700,750,800];
+  
+    if(level < 15){
+      currentXp += 5;
+  
+      // kiểm tra đủ XP lên cấp
+      while(level < 15 && currentXp >= levelXP[level]){
+        currentXp -= levelXP[level];
+        level++;
+      }
+  
+      // nếu level=15, giới hạn XP max = 6749
+      if(level >= 15){
+        level = 15;
+        currentXp = Math.min(currentXp, 6749);
+      }
+  
+      // cập nhật lại Firebase
+      await xpRef.set(currentXp);
+      await lvRef.set(level);
+    }
+  } else {
+    // token bypass, chỉ trừ coin
+    await coinRef.set(Math.max(0, currentCoin + coinChange));
+  }
+
+  document.getElementById("status").innerText = `Đã hoàn thành! (${coinChange>0 ? '+' : ''}${coinChange} coin)`;
+
+  // --- xóa token khỏi localStorage ---
+  localStorage.removeItem("luxta_token");
+
+  // --- đóng page sau 1.2s ---
+  setTimeout(() => {
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage("close");
+    window.close();
+  }, 1200);
+}
+</script>
+</body>
+</html>
