@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Luxta Academy - Link</title>
+
+<style>
+  @font-face { font-family: 'Pixil'; src: url('pixil.otf') format('opentype'); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%; width: 100%;
+    font-family: 'Pixil', monospace;
+    background: #424242; color: #fff;
+    display: flex; justify-content: center; align-items: center; flex-direction: column;
+  }
+  #frame {
+    background: #2c2c2c; padding: 30px 40px; border-radius: 15px;
+    text-align: center; width: 90%; max-width: 400px;
+    box-shadow: 0 0 20px rgba(200,120,255,0.5);
+  }
+  #l_name { font-size: 24px; margin-bottom: 20px; }
+  progress { width: 100%; height: 20px; margin-bottom: 20px; appearance: none; border-radius: 10px; }
+  progress::-webkit-progress-bar { background: #555; border-radius: 10px; }
+  progress::-webkit-progress-value { background-color: #c879ff; border-radius: 10px; }
+  .start { padding: 10px 20px; background: linear-gradient(45deg,#c879ff,#8f49ff); border: none; border-radius: 10px; color: #fff; font-size: 18px; cursor: pointer; font-family: 'Pixil', monospace}
+  .cre { color: #aaa; margin-top: 20px; font-size: 12px; }
+</style>
+</head>
+
+<body>
+<div id="frame">
+  <p id="l_name">Link</p>
+  <p id="count">0/2</p>
+  <progress value="0" max="2"></progress>
+  <button class="start">Bắt đầu</button>
+</div>
+
+<p class="cre">Created and managed by Luxta Academy</p>
+
+<script type="module">
+const url = new URL(location.href);
+const uid = url.searchParams.get("uid");
+const linkId = url.searchParams.get("link") || "1";
+
+if (!uid || !uid.trim()) {
+  alert("Không tìm thấy UID. Mở từ trong app!");
+  throw new Error("Missing UID");
+}
+
+const lNameEl = document.getElementById("l_name");
+const countText = document.getElementById("count");
+const progressBar = document.querySelector("progress");
+const startBtn = document.querySelector(".start");
+
+lNameEl.textContent = "Link " + linkId;
+
+// Gọi server để lấy token và số lần vượt hôm nay
+async function loadToken() {
+  try {
+    const res = await fetch("https://render-backend-wnt8.onrender.com/get-token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid, linkId })
+    });
+
+    const data = await res.json();
+
+    const count = data.countToday ?? 0;
+    progressBar.value = count;
+    countText.textContent = `${count}/2`;
+    startBtn.disabled = count >= 2;
+    startBtn.style.opacity = count >= 2 ? "0.6" : "1";
+
+    if (data.ok && data.token) {
+      // Lưu token để Web2 redeem
+      localStorage.setItem("luxta_token", data.token);
+    }
+  } catch (err) {
+    console.error("Lỗi khi gọi server:", err);
+  }
+}
+
+loadToken();
+
+startBtn.addEventListener("click", () => {
+  const count = parseInt(progressBar.value) || 0;
+  if (count >= 2) {
+    alert("Hôm nay bạn đã vượt đủ 2 lần của link này.");
+    return;
+  }
+
+  window.open("https://link4m.com/NM0ghGn", "_blank"); // bạn có thể map lại tùy linkId
+});
+</script>
+</body>
+</html>

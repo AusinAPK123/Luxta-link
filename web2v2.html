@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Luxta Academy - Web2</title>
+<style>
+  @font-face {
+    font-family: 'Pixil';
+    src: url('Pixil.otf') format('opentype');
+  }
+  
+  body {
+    background:#111; color:white;
+    display:flex; align-items:center; justify-content:center;
+    height:100vh; font-size:20px;
+    font-family: 'Pixil', monospace;
+  }
+</style>
+</head>
+<body>
+  <p id="status">Đang kiểm tra...</p>
+
+</body>
+<script>
+// --- lấy token từ URL hoặc localStorage ---
+const urlParams = new URLSearchParams(window.location.search);
+const token = urlParams.get("token") || localStorage.getItem("luxta_token");
+
+if (!token) {
+  document.getElementById("status").innerText = "Token không hợp lệ.";
+} else {
+  document.getElementById("status").innerText = "Đang kiểm tra token...";
+
+  const delay = Math.random() * (3000 - 1500) + 1500;
+  setTimeout(async () => {
+    try {
+      // --- gửi request lên server để redeem token (cộng coin + update link count) ---
+      const redeemRes = await fetch("https://your-server.com/use-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token })
+      });
+      const redeemData = await redeemRes.json();
+
+      if (!redeemData.ok) {
+        document.getElementById("status").innerText = redeemData.error || "Token không hợp lệ";
+        return;
+      }
+
+      // --- sau khi cộng coin thành công, tăng XP ---
+      const xpRes = await fetch("https://your-server.com/add-xp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: redeemData.uid, xpToAdd: 5 }) // bạn có thể đổi số XP mỗi lần
+      });
+      const xpData = await xpRes.json();
+
+      if (xpData.ok) {
+        document.getElementById("status").innerText =
+          `Đã cộng ${redeemData.added} coin!\nXP hiện tại: ${xpData.xp}, Level: ${xpData.level}`;
+      } else {
+        document.getElementById("status").innerText = xpData.error || "Lỗi tăng XP";
+      }
+
+    } catch (err) {
+      console.error(err);
+      document.getElementById("status").innerText = "Không kết nối được server";
+    } finally {
+      localStorage.removeItem("luxta_token");
+
+      setTimeout(() => {
+        if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage("close");
+        window.close();
+      }, 1200);
+    }
+  }, delay);
+}
+</script>
+</html>
