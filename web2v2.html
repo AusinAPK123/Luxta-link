@@ -49,7 +49,7 @@ if (!token) {
       }
 
       // --- sau khi cộng coin thành công, tăng XP ---
-      const xpRes = await fetch("https://your-server.com/add-xp", {
+      const xpRes = await fetch("https://render-backend-wnt8.onrender.com/add-xp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ uid: redeemData.uid, xpToAdd: 5 }) // bạn có thể đổi số XP mỗi lần
