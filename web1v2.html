@@ -55,7 +55,36 @@ const startBtn = document.querySelector(".start");
 
 lNameEl.textContent = "Link " + linkId;
 
-// Gọi server để lấy token và số lần vượt hôm nay
+// KHÓA nút Start ban đầu
+startBtn.disabled = true;
+startBtn.style.opacity = 0.6;
+
+// Map tất cả link
+const linkMap = {
+  "1": "https://link4m.com/NM0ghGn",
+  "2": "https://link4m.com/rkjy6Yko",
+  "3": "https://link4m.com/iwARQo",
+  "4": "https://link4m.com/ePGuQa",
+  "5": "https://link4m.com/08YN5p",
+  "6": "https://link4m.com/IxrZI",
+  "7": "https://link4m.com/CBxE3",
+  "8": "https://link4m.com/YJF4VzkF",
+  "9": "https://link4m.com/yhwKv",
+  "10": "https://link4m.com/2bpdrEPA",
+  "11": "https://link4m.com/Sd9oG",
+  "12": "https://link4m.com/wU1RFyQ",
+  "13": "https://link4m.com/xUUNWw3",
+  "14": "https://link4m.com/LSMX1",
+  "15": "https://link4m.com/HVx0keIk",
+  "16": "https://link4m.com/dRnCo",
+  "17": "https://link4m.com/SdIWL2U",
+  "18": "https://link4m.com/WcPjBVls",
+  "19": "https://link4m.com/xjFoz",
+  "20": "https://link4m.com/obRsm"
+};
+const defaultLink = "https://link4m.co/default";
+
+// --- Gọi server để lấy token và số lần vượt hôm nay ---
 async function loadToken() {
   try {
     const res = await fetch("https://render-backend-wnt8.onrender.com/get-token", {
@@ -69,20 +98,28 @@ async function loadToken() {
     const count = data.countToday ?? 0;
     progressBar.value = count;
     countText.textContent = `${count}/2`;
-    startBtn.disabled = count >= 2;
-    startBtn.style.opacity = count >= 2 ? "0.6" : "1";
 
-    if (data.ok && data.token) {
-      // Lưu token để Web2 redeem
+    if (count >= 2) {
+      startBtn.disabled = true;
+      startBtn.style.opacity = 0.6;
+    } else if (data.ok && data.token) {
       localStorage.setItem("luxta_token", data.token);
+      startBtn.disabled = false;
+      startBtn.style.opacity = 1;
+    } else {
+      startBtn.disabled = false;
+      startBtn.style.opacity = 1;
     }
   } catch (err) {
     console.error("Lỗi khi gọi server:", err);
+    alert("Không kết nối được server, thử lại sau.");
   }
 }
 
+// Gọi lần đầu
 loadToken();
 
+// Khi nhấn Start
 startBtn.addEventListener("click", () => {
   const count = parseInt(progressBar.value) || 0;
   if (count >= 2) {
@@ -90,7 +127,8 @@ startBtn.addEventListener("click", () => {
     return;
   }
 
-  window.open("https://link4m.com/NM0ghGn", "_blank"); // bạn có thể map lại tùy linkId
+  const targetLink = linkMap[linkId] || defaultLink;
+  window.open(targetLink, "_blank");
 });
 </script>
 </body>
