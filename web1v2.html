@@ -130,6 +130,12 @@ startBtn.addEventListener("click", () => {
   const targetLink = linkMap[linkId] || defaultLink;
   window.open(targetLink, "_blank");
 });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      location.reload();
+    }
+  });
 </script>
 </body>
 </html>
