@@ -36,7 +36,7 @@ if (!token) {
   setTimeout(async () => {
     try {
       // --- gửi request lên server để redeem token (cộng coin + update link count) ---
-      const redeemRes = await fetch("https://your-server.com/use-token", {
+      const redeemRes = await fetch("https://render-backend-wnt8.onrender.com/use-token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token })
@@ -47,21 +47,9 @@ if (!token) {
         document.getElementById("status").innerText = redeemData.error || "Token không hợp lệ";
         return;
       }
-
-      // --- tăng XP ---
-      const xpRes = await fetch("https://render-backend-wnt8.onrender.com/add-xp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: redeemData.uid, xpToAdd: 5 })
-      });
-      const xpData = await xpRes.json();
-
-      if (xpData.ok) {
-        document.getElementById("status").innerText =
-          `Đã cộng ${redeemData.added} coin!\nXP hiện tại: ${xpData.xp}, Level: ${xpData.level}`;
-      } else {
-        document.getElementById("status").innerText = xpData.error || "Lỗi tăng XP";
-      }
+      
+    document.getElementById("status").innerText =
+  `Đã cộng ${redeemData.added} coin!\nXP hiện tại: ${redeemData.xp}, Level: ${redeemData.level}`;
 
     } catch (err) {
       console.error(err);
