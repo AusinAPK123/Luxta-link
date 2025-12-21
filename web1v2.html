@@ -87,9 +87,6 @@ const defaultLink = "https://link4m.co/default";
 // --- Gọi server để lấy token và số lần vượt hôm nay ---
 async function loadToken() {
   try {
-    startBtn.disabled = true;
-    startBtn.style.opacity = 0.6;
-
     const res = await fetch("https://render-backend-wnt8.onrender.com/get-token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -116,8 +113,6 @@ async function loadToken() {
   } catch (err) {
     console.error("Lỗi khi gọi server:", err);
     alert("Không kết nối được server, thử lại sau.");
-    startBtn.disabled = false;
-    startBtn.style.opacity = 1;
   }
 }
 
@@ -134,13 +129,6 @@ startBtn.addEventListener("click", () => {
 
   const targetLink = linkMap[linkId] || defaultLink;
   window.open(targetLink, "_blank");
-});
-
-// Khi người dùng quay lại tab, fetch lại token & số lần vượt
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
-    loadToken(); // update progress và token mà không reload page
-  }
 });
 </script>
 </body>
