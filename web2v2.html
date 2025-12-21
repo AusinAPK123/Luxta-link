@@ -36,7 +36,7 @@ if (!token) {
   setTimeout(async () => {
     try {
       // --- gửi request lên server để redeem token (cộng coin + update link count) ---
-      const redeemRes = await fetch("https://render-backend-wnt8.onrender.com/use-token", {
+      const redeemRes = await fetch("https://your-server.com/use-token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token })
@@ -48,11 +48,11 @@ if (!token) {
         return;
       }
 
-      // --- sau khi cộng coin thành công, tăng XP ---
+      // --- tăng XP ---
       const xpRes = await fetch("https://render-backend-wnt8.onrender.com/add-xp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: redeemData.uid, xpToAdd: 5 }) // bạn có thể đổi số XP mỗi lần
+        body: JSON.stringify({ uid: redeemData.uid, xpToAdd: 5 })
       });
       const xpData = await xpRes.json();
 
