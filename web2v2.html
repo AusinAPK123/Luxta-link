@@ -23,46 +23,59 @@
 
 </body>
 <script>
-// --- lấy token từ URL hoặc localStorage ---
-const urlParams = new URLSearchParams(window.location.search);
-const token = urlParams.get("token") || localStorage.getItem("luxta_token");
+  // --- lấy token từ URL hoặc localStorage ---
+  const urlParams = new URLSearchParams(window.location.search);
+  const token = urlParams.get("token") || localStorage.getItem("luxta_token");
 
-if (!token) {
-  document.getElementById("status").innerText = "Token không hợp lệ.";
-} else {
-  document.getElementById("status").innerText = "Đang kiểm tra token...";
+  const statusEl = document.getElementById("status");
 
-  const delay = Math.random() * (3000 - 1500) + 1500;
-  setTimeout(async () => {
-    try {
-      // --- gửi request lên server để redeem token (cộng coin + update link count) ---
-      const redeemRes = await fetch("https://render-backend-wnt8.onrender.com/use-token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token })
-      });
-      const redeemData = await redeemRes.json();
+  if (!token) {
+    statusEl.innerText = "Token không hợp lệ.";
+  } else {
+    statusEl.innerText = "Đang kiểm tra token...";
 
-      if (!redeemData.ok) {
-        document.getElementById("status").innerText = redeemData.error || "Token không hợp lệ";
-        return;
+    const delay = Math.random() * (3000 - 1500) + 1500;
+
+    setTimeout(async () => {
+      try {
+        // --- gửi request redeem token ---
+        const redeemRes = await fetch(
+          "https://render-backend-wnt8.onrender.com/use-token",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token })
+          }
+        );
+
+        const redeemData = await redeemRes.json();
+
+        // ❌ server trả về lỗi hợp lệ → xoá token
+        if (!redeemData.ok) {
+          statusEl.innerText = redeemData.error || "Token không hợp lệ";
+          localStorage.removeItem("luxta_token");
+          return;
+        }
+
+        // ✅ thành công → xoá token
+        localStorage.removeItem("luxta_token");
+
+        statusEl.innerText =
+          `Đã cộng ${redeemData.added} coin!`;
+
+        setTimeout(() => {
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage("close");
+          }
+          window.close();
+        }, 1200);
+
+      } catch (err) {
+        // ⚠️ lỗi mạng / server chết → KHÔNG xoá token
+        console.error(err);
+        statusEl.innerText = "Không kết nối được server, vui lòng thử lại";
       }
-      
-    document.getElementById("status").innerText =
-  `Đã cộng ${redeemData.added} coin!\nXP hiện tại: ${redeemData.xp}, Level: ${redeemData.level}`;
-
-    } catch (err) {
-      console.error(err);
-      document.getElementById("status").innerText = "Không kết nối được server";
-    } finally {
-      localStorage.removeItem("luxta_token");
-
-      setTimeout(() => {
-        if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage("close");
-        window.close();
-      }, 1200);
-    }
-  }, delay);
-}
+    }, delay);
+  }
 </script>
 </html>
