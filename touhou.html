@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <style>
+    html, body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+      overflow: hidden;
+      touch-action: none;
+      background: #3c3c3c;
+    }
+    
+    #jt_f {
+      display: none; /* Ẩn ban đầu */
+      justify-content: center;
+      align-items: center;
+      height: 140px;
+      width: 140px;
+      background: transparent;
+      border-radius: 50%;
+      position: absolute;
+      pointer-events: none; /* để không chặn touchstart */
+      border: 1px solid #ffffff;
+    }
+    
+    #jt_c {
+      height: 50px;
+      width: 50px;
+      background: #d3d3d3;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    
+    #player {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 50px;
+      width: 50px;
+      background: transparent;
+      border: 1px solid #ffffff;
+    }
+    
+    #hitbox {
+      height: 15px;
+      width: 15px;
+      background: red;
+      border-radius: 50%;
+    }
+    
+    #boss {
+      height: 75px;
+      width: 75px;
+      background: green;
+    }
+    
+    .bullet {
+      position: absolute;
+      height: 8px;
+      width: 8px;
+      background: yellow;
+      border-radius: 50%;
+      pointer-events: none;
+      will-change: transform;
+    }
+    
+    #bulletCanvas {
+      position: fixed;
+      left: 0; top: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none; /* không cản touch của joystick */
+    }
+    
+    #top_bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      display: flex;
+      justify-content: space-between; /* 2 đầu */
+      align-items: center;
+      padding: 20px;
+      box-sizing: border-box;
+      z-index: 9999999;
+    }
+    
+    /* Đồng hồ và HP */
+    #time, #hp {
+      white-space: nowrap; /* không xuống dòng */
+      overflow: hidden;    /* ẩn chữ nếu quá dài */
+      text-overflow: ellipsis; /* thêm ... nếu tràn */
+      max-width: 45%;      /* giới hạn chiều rộng để không tràn */
+      color: #ffffff;
+    }
+    
+    p {
+      padding: 0;
+      margin: 0;
+      color: #ffffff;
+    }
+    
+    #miniPopup {
+      position: fixed;
+      inset: 0;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      pointer-events: none; /* không chặn người chơi */
+      z-index: 10001;
+    }
+    
+    #miniPopupBox {
+      z-index: ;
+      background: #222;
+      color: white;
+      padding: 20px 30px;
+      border-radius: 12px;
+      font-size: 20px;
+      max-width: 300px;
+      width: fit-content;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.35);
+      position: relative;
+      pointer-events: auto; /* popup mới nhận click */
+      animation: miniPopupIn 0.25s ease-out;
+    }
+    
+    #miniPopupClose {
+      position: absolute;
+      top: 6px;
+      right: 10px;
+      font-size: 24px;
+      cursor: pointer;
+      color: #ff6666;
+      user-select: none;
+    }
+    
+    #miniPopupClose:hover {
+      color: white;
+    }
+    
+    @keyframes miniPopupIn {
+      from { transform: translateY(-10px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div id="top_bar">
+    <p id="time">00:00:00</p>
+    <p id="hp">100/100</p>
+  </div>
+  <canvas id="bulletCanvas"></canvas>
+
+  <div id="boss"></div>
+  <div id="player">
+    <div id="hitbox"></div>
+  </div>
+  <div id="jt_f">
+    <div id="jt_c"></div>
+  </div>
+    
+  <div id="miniPopup">
+    <div id="miniPopupBox">
+      <div id="miniPopupClose">✕</div>
+      <div id="miniPopupMessage"></div>
+    </div>
+  </div>
+</body>
+<script>
+  let bossPaused = false;
+  let phase2Active = false;
+  let phase3Active = false;
+  let phase4Active = false;
+  let hpValue = 100;
+  const hpEl = document.getElementById("hp");
+  hpEl.textContent = hpValue + "/100";
+/* ==============================
+        JOYSTICK + PLAYER
+============================== */
+const joystick = document.getElementById("jt_f");
+const knob = document.getElementById("jt_c");
+
+let dragging = false;
+let startPos = { x: 0, y: 0 };
+let radius = 70;
+const player = document.getElementById("player");
+
+// Player ban đầu: giữa màn + cách đáy 50px
+const startX = window.innerWidth / 2 - player.offsetWidth / 2;
+const startY = window.innerHeight - player.offsetHeight - 50;
+player.style.position = "absolute";
+player.style.left = startX + "px";
+player.style.top = startY + "px";
+
+let moveX = 0;
+let moveY = 0;
+let speed = 4;
+let lockPlayer = false;
+let joystickEnabled = true; // mới thêm
+
+document.addEventListener("touchstart", e => {
+  if (!joystickEnabled) return; // tạm tắt joystick khi chết
+  
+  const t = e.touches[0];
+  startPos.x = t.clientX;
+  startPos.y = t.clientY;
+
+  joystick.style.left = (startPos.x - radius) + "px";
+  joystick.style.top = (startPos.y - radius) + "px";
+  joystick.style.display = "flex";
+  dragging = true;
+});
+
+document.addEventListener("touchmove", e => {
+  if (!dragging) return;
+  const t = e.touches[0];
+  const dx = t.clientX - startPos.x;
+  const dy = t.clientY - startPos.y;
+
+  const dist = Math.hypot(dx, dy);
+  let limitX = dx, limitY = dy;
+
+  if (dist > radius) {
+    const angle = Math.atan2(dy, dx);
+    limitX = Math.cos(angle) * radius;
+    limitY = Math.sin(angle) * radius;
+  }
+
+  knob.style.transform = `translate(${limitX}px, ${limitY}px)`;
+
+  moveX = limitX / radius;
+  moveY = limitY / radius;
+});
+
+document.addEventListener("touchend", () => {
+  dragging = false;
+  knob.style.transform = "translate(0,0)";
+  joystick.style.display = "none";
+  moveX = 0; moveY = 0;
+});
+
+function updatePlayer() {
+  const rect = player.getBoundingClientRect();
+  let x = rect.left + moveX * speed;
+  let y = rect.top + moveY * speed;
+  if (lockPlayer) { requestAnimationFrame(updatePlayer); return; }
+
+  const maxX = window.innerWidth - rect.width;
+  const maxY = window.innerHeight - rect.height;
+
+  x = Math.max(0, Math.min(maxX, x));
+  y = Math.max(0, Math.min(maxY, y));
+
+  player.style.left = x + "px";
+  player.style.top = y + "px";
+
+  requestAnimationFrame(updatePlayer);
+}
+updatePlayer();
+
+
+
+
+
+function showMiniPopup(msg) {
+  const box = document.getElementById("miniPopup");
+  document.getElementById("miniPopupMessage").innerHTML = msg;
+  box.style.display = "flex";
+}
+
+document.getElementById("miniPopupClose").onclick = () => {
+  document.getElementById("miniPopup").style.display = "none";
+};
+
+const timeEl = document.getElementById("time");
+
+let startTime = Date.now();
+let elapsedBeforePause = 0; // thời gian đã trôi trước khi pause
+let timePaused = false;
+let timerInterval = null;
+
+function startTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+
+  timerInterval = setInterval(() => {
+    if (!timePaused) {
+      const elapsed = Date.now() - startTime + elapsedBeforePause;
+
+      const totalSec = Math.floor(elapsed / 1000);
+      const minutes = String(Math.floor(totalSec / 60)).padStart(2, "0");
+      const seconds = String(totalSec % 60).padStart(2, "0");
+      const tick = Math.floor((elapsed % 1000) / (1000 / 30));
+      const tickStr = String(tick).padStart(2, "0");
+
+      timeEl.textContent = `${minutes}:${seconds}:${tickStr}`;
+    }
+  }, 1000 / 30);
+}
+
+function pauseTimer() {
+  if (!timePaused) {
+    timePaused = true;
+    elapsedBeforePause += Date.now() - startTime;
+  }
+}
+
+function continueTimer() {
+  if (timePaused) {
+    timePaused = false;
+    startTime = Date.now();
+  }
+}
+
+startTimer();
+
+
+
+
+
+/* ==============================
+              BOSS
+============================== */
+const boss = document.getElementById("boss");
+boss.style.position = "absolute";
+
+let bossX = window.innerWidth / 2 - 50;
+let bossY = 50;
+
+const minX = 0;
+const maxX = window.innerWidth;
+const minY = 0;
+const maxY = window.innerHeight * 0.5;
+
+let bossSpeed = 1;
+let dirX = (Math.random() * 2 - 1);
+let dirY = (Math.random() * 2 - 1);
+let spiralUpgraded = false;
+
+setInterval(() => {
+  dirX = (Math.random() * 2 - 1);
+  dirY = (Math.random() * 2 - 1);
+}, 700);
+
+function updateBoss() {
+  const p = player.getBoundingClientRect();
+  const b = boss.getBoundingClientRect();
+
+  if (!stopBullets) {
+      bossX += dirX * bossSpeed;
+      bossY += dirY * bossSpeed;
+  }
+
+  const dx = p.left - b.left;
+  if (Math.abs(dx) > 200) {
+    bossX += Math.sign(dx) * bossSpeed * 0.7;
+  }
+
+  bossX = Math.max(minX, Math.min(maxX - b.width, bossX));
+  bossY = Math.max(minY, Math.min(maxY - b.height, bossY));
+
+  boss.style.left = bossX + "px";
+  boss.style.top = bossY + "px";
+
+  requestAnimationFrame(updateBoss);
+}
+
+
+/* ==============================
+         BULLET SYSTEM
+============================== */
+const canvas = document.getElementById("bulletCanvas");
+const ctx = canvas.getContext("2d");
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+let bullets = [];
+let stopBullets = false;
+let phase = 1;
+let phase2Started = false;
+
+
+/* spawn bullet */
+function spawnBullet(x, y, angle, speed) {
+  bullets.push({
+    x, y,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    size: 6,
+    bounce: 0
+  });
+}
+
+/* Phase 2 bullet create (bounce version) */
+function spawnBounceBullet(x, y, angle, speed) {
+  bullets.push({
+    x, y,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    size: 6,
+    bounce: 0
+  });
+}
+
+/* update bullets */
+function bulletHitPlayer(b, hb) {
+  // Kiểm tra vị trí hiện tại
+  if (
+    b.x + b.size >= hb.left &&
+    b.x - b.size <= hb.right &&
+    b.y + b.size >= hb.top &&
+    b.y - b.size <= hb.bottom
+  ) {
+    return true;
+  }
+
+  // Sweep theo tốc độ (bullet nhanh không bị xuyên)
+  const dx = b.x - b.oldX;
+  const dy = b.y - b.oldY;
+  const dist = Math.max(Math.abs(dx), Math.abs(dy));
+  const steps = Math.ceil(dist / (b.size * 0.8));
+
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const sx = b.oldX + dx * t;
+    const sy = b.oldY + dy * t;
+
+    if (
+      sx + b.size >= hb.left &&
+      sx - b.size <= hb.right &&
+      sy + b.size >= hb.top &&
+      sy - b.size <= hb.bottom
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function updateBullets() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const hitbox = document.getElementById("hitbox").getBoundingClientRect();
+
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+
+    // Lưu vị trí cũ phục vụ sweep
+    b.oldX = b.x;
+    b.oldY = b.y;
+
+    // Di chuyển đạn
+    if (!stopBullets) {
+      b.x += b.vx;
+      b.y += b.vy;
+    }
+
+    // Xoá nếu ra khỏi màn hình
+    if (b.x < -50 || b.x > canvas.width + 50 ||
+        b.y < -50 || b.y > canvas.height + 50) {
+      bullets.splice(i, 1);
+      continue;
+    }
+
+    // Bounce phase 2 + 4
+    if (phase === 2 || phase === 4) {
+      if (b.x <= 0 || b.x >= canvas.width) {
+        b.vx *= -1;
+        b.bounce++;
+      }
+      if (b.y <= 0 || b.y >= canvas.height) {
+        b.vy *= -1;
+        b.bounce++;
+      }
+      if (b.bounce >= 2) {
+        bullets.splice(i, 1);
+        continue;
+      }
+    }
+
+    // Bounce phase 3 (nhiều hơn)
+    if (phase === 3 && b.phase3) {
+      if (b.x <= 0 || b.x >= canvas.width) {
+        b.vx *= -1;
+        b.bounce++;
+      }
+      if (b.y <= 0 || b.y >= canvas.height) {
+        b.vy *= -1;
+        b.bounce++;
+      }
+      if (b.bounce >= b.maxBounce) {
+        bullets.splice(i, 1);
+        continue;
+      }
+    }
+
+    // Vẽ bullet
+    ctx.beginPath();
+    ctx.fillStyle = "yellow";
+    ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Va chạm (không xuyên)
+    if (bulletHitPlayer(b, hitbox)) {
+      bullets.splice(i, 1);
+      hpValue = Math.max(0, hpValue - 1);
+      hpEl.textContent = hpValue + "/100";
+
+      if (hpValue <= 0 && !isDead) {
+        isDead = true;
+        onPlayerDead();
+      }
+      continue;
+    }
+  }
+}
+
+
+
+let isDead = false;
+let isRevived = false;
+
+function onPlayerDead() {
+  if (!isDead) {
+    isDead = true;
+    pauseGame();
+    showPopup();
+  }
+  
+  // Tạm dừng game
+  stopBullets = true;
+  lockPlayer = true;
+  joystickEnabled = false;
+
+  // Dừng tất cả attack loop
+  if (phase1Timer) clearInterval(phase1Timer);
+  if (phase2SpiralLoop) clearInterval(phase2SpiralLoop);
+  if (phase3Interval) clearInterval(phase3Interval);
+  if (phase4Loop) clearInterval(phase4Loop);
+
+  // Tạm dừng timer
+  timePaused = true;
+  pauseStartTime = Date.now();
+
+  // Hiện popup
+  const popup = document.createElement("div");
+  popup.style.position = "fixed";
+  popup.style.top = "50%";
+  popup.style.left = "50%";
+  popup.style.transform = "translate(-50%, -50%)";
+  popup.style.background = "#222";
+  popup.style.color = "#fff";
+  popup.style.padding = "20px";
+  popup.style.border = "2px solid #fff";
+  popup.style.borderRadius = "10px";
+  popup.style.textAlign = "center";
+  popup.style.zIndex = "10000";
+
+  popup.innerHTML = `
+    <p style="margin-bottom: 20px;">Bạn đã thua</p>
+    <button id="reviveBtn" style="margin-right: 10px;">Hồi sinh</button>
+    <button id="exitBtn">Thoát</button>
+  `;
+
+  document.body.appendChild(popup);
+
+  document.getElementById("exitBtn").addEventListener("click", () => {
+    isRevived = false;
+    location.reload(); // reload game
+  });
+
+  document.getElementById("reviveBtn").addEventListener("click", () => {
+    if (isRevived) {
+      showMiniPopup("Bạn chỉ được hồi sinh 1 lần!");
+      return;
+    }
+    const useCoin = confirm("Bạn có muốn hồi sinh với 60 coin?");
+    if (!useCoin) return;
+    
+    // Khi revive:
+    isDead = false;
+    isRevived = true;
+    continueGame();
+    // Hồi sinh: xóa đạn, bật lại game
+    bullets.length = 0;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    hpValue = 100;
+    hpEl.textContent = hpValue + "/100";
+
+    stopBullets = false;
+    lockPlayer = false;
+    joystickEnabled = true;
+
+    // Bật lại timer
+    timePaused = false;
+    startTime += (Date.now() - pauseStartTime); // tiếp tục từ thời gian cũ
+
+    // Bật lại các attack loop phù hợp phase
+    if (phase === 1) phase1Timer = setInterval(shootBurst, 2500);
+    if (phase === 2) {
+      phase2SpiralLoop = setInterval(() => {
+        if (!spiralUpgraded) fireSpiralOld();
+        else fireSpiral();
+      }, 2000);
+    }
+    if (phase === 3) {
+      phase3Interval = setInterval(() => {
+        spawnPhase3Bullet();
+      }, 2000);
+    }
+    if (phase === 4) startPhase4_Attacks();
+
+    popup.remove();
+  });
+}
+
+function pauseGame() {
+  stopBullets = true;
+  lockPlayer = true;
+  joystickEnabled = false;
+
+  bossPaused = true;
+
+  timePaused = true;
+  pauseStartTime = Date.now();
+
+  if (phase1Timer) clearInterval(phase1Timer);
+  if (phase2SpiralLoop) clearInterval(phase2SpiralLoop);
+  if (phase3Interval) clearInterval(phase3Interval);
+  if (phase4Loop) clearInterval(phase4Loop);
+}
+
+function continueGame() {
+  stopBullets = false;
+  lockPlayer = false;
+  joystickEnabled = true;
+
+  bossPaused = false;
+
+  timePaused = false;
+  startTime += (Date.now() - pauseStartTime);
+}
+
+function loop() {
+  updateBullets(); // bao gồm cả vẽ bullet + trừ HP + check thua
+  requestAnimationFrame(loop);
+}
+loop();
+
+/* ==============================
+       PHASE 1 SHOOTING
+============================== */
+function shootBurst() {
+  if (phase !== 1) return;
+
+  const b = boss.getBoundingClientRect();
+  const cx = b.left + b.width / 2;
+  const cy = b.top + b.height / 2;
+
+  const rings = 3;
+  const count = 50;
+
+  for (let r = 0; r < rings; r++) {
+    const spd = 0.6 + r * 0.3;
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 / count) * i + r * 0.15;
+      spawnBullet(cx, cy, angle, spd);
+    }
+  }
+}
+
+let phase1Timer = setInterval(shootBurst, 2500);
+
+/* ==============================
+         PHASE 2 SYSTEM
+============================== */
+
+/* chữ từng ký tự */
+function showWarningText(message, callback) {
+  const div = document.createElement("div");
+  div.style.position = "fixed";
+  div.style.top = "40%";
+  div.style.left = "50%";
+  div.style.transform = "translate(-50%, -50%)";
+  div.style.color = "red";
+  div.style.textShadow = "0 0 10px red";
+  div.style.fontSize = "20px";
+  div.style.fontWeight = "bold";
+  div.style.fontFamily = "monospace";
+  div.style.whiteSpace = "nowrap"; // không xuống dòng
+  div.style.zIndex = "9999";
+  document.body.appendChild(div);
+
+  let i = 0;
+  let timer = setInterval(() => {
+    div.textContent = message.substring(0, i);
+    i++;
+    if (i > message.length) {
+      clearInterval(timer);
+      setTimeout(() => {
+        div.remove();
+        callback();
+      }, 800);
+    }
+  }, 100);
+}
+
+/* đạn lao vào player */
+function burstAttackToPlayer() {
+  const p = player.getBoundingClientRect();
+  const px = p.left + p.width / 2;
+  const py = p.top + p.height / 2;
+
+  bullets.forEach(b => {
+    const angle = Math.atan2(py - b.y, px - b.x);
+    b.vx = Math.cos(angle) * 1;
+    b.vy = Math.sin(angle) * 1;
+  });
+
+  stopBullets = false;
+}
+
+
+/* spiral (lốc xoáy) */
+function fireSpiralOld() {
+  const b = boss.getBoundingClientRect();
+  const cx = b.left + b.width / 2;
+  const cy = b.top + b.height / 2;
+
+  let i = 0;
+  const total = 30;
+
+  let t = setInterval(() => {
+    if (i >= total) {
+      clearInterval(t);
+      return;
+    }
+
+    const angle = (Math.PI * 2 / total) * i;
+    spawnBounceBullet(cx, cy, angle, 0.8);
+    i++;
+  }, 40);
+}
+function fireSpiral() {
+  const b = boss.getBoundingClientRect();
+  const cx = b.left + b.width / 2;
+  const cy = b.top + b.height / 2;
+
+  let i = 0;
+  const total = 30;
+
+  let t = setInterval(() => {
+    if (i >= total) {
+      clearInterval(t);
+      return;
+    }
+
+    const angle = (Math.PI * 2 / total) * i;
+    const opposite = angle + Math.PI;
+
+    // 2 vòi phun - 2 hướng đối nhau
+    spawnBounceBullet(cx, cy, angle, 0.8);
+    spawnBounceBullet(cx, cy, opposite, 0.8);
+
+    i++;
+  }, 40);
+}
+
+let phase2SpiralLoop = null;
+/* bắt đầu Phase 2 */
+function startPhase2() {
+  console.log("phase2")
+  phase = 2;
+  phase2Started = true;
+  stopBullets = true;
+  clearInterval(phase1Timer);
+
+  // 10s sau sẽ bật spiral nâng cấp
+  setTimeout(() => {
+    spiralUpgraded = true;
+  }, 10000);
+
+  showWarningText("You should stop here.", () => {
+    burstAttackToPlayer();
+    setTimeout(() => {
+      
+      setTimeout(() => {
+        phase2SpiralLoop = setInterval(() => {
+          if (phase !== 2) return;
+      
+          if (!spiralUpgraded) fireSpiralOld();
+          else fireSpiral();
+      
+        }, 2000);
+      }, 1000);
+    }, 1000);
+  });
+    // Phase 3 sau 30s phase 2
+  setTimeout(() => {
+    if (!phase3Started) endPhase2AndStartPhase3();
+  }, 30000);
+}
+
+let phase3Started = false;
+
+function endPhase2AndStartPhase3() {
+  if (phase3Started) return;
+  phase3Started = true;
+
+  phase = 3;
+
+  // freeze tất cả trong khi hiển thị WOW
+  stopBullets = true;
+  lockPlayer = true;
+  const oldDirX = dirX;
+  const oldDirY = dirY;
+  dirX = 0;
+  dirY = 0;
+
+  if (phase2SpiralLoop) clearInterval(phase2SpiralLoop);
+
+  showWarningText("WOW", () => {
+
+    // Xoá toàn bộ bullet
+    bullets.length = 0;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Khôi phục chuyển động boss
+    dirX = (Math.random() * 2 - 1);
+    dirY = (Math.random() * 2 - 1);
+
+    stopBullets = false;  // đạn bay lại
+    lockPlayer = false;   // player di chuyển lại
+
+    // Bắt đầu Phase 3 attack
+    startPhase3();
+  });
+}
+
+function spawnPhase3Bullet() {
+  const b = boss.getBoundingClientRect();
+  const cx = b.left + b.width / 2;
+  const cy = b.top + b.height / 2;
+
+  // Player để ngắm vào
+  const p = player.getBoundingClientRect();
+  const px = p.left + p.width / 2;
+  const py = p.top + p.height / 2;
+
+  const angle = Math.atan2(py - cy, px - cx);
+
+  bullets.push({
+    x: cx,
+    y: cy,
+    vx: Math.cos(angle) * 25,   // tốc độ rất nhanh
+    vy: Math.sin(angle) * 25,
+    size: 8,
+    bounce: 0,
+    maxBounce: 20,
+    phase3: true
+  });
+}
+
+let phase3Interval = null;
+
+function startPhase3() {
+  console.log("phase3")
+  phase = 3;
+  if (phase2SpiralLoop) {
+      clearInterval(phase2SpiralLoop);
+      phase2SpiralLoop = null;
+    }
+
+  // bắn 1 viên mỗi 10s
+  phase3Interval = setInterval(() => {
+    if (phase !== 3) return;
+    spawnPhase3Bullet();
+  }, 2000);
+
+  // Bắn viên đầu tiên ngay lập tức
+  spawnPhase3Bullet();
+    // ---- Phase 4 sau 60s Phase 3 ----
+  setTimeout(() => {
+    if (!phase4Started) startPhase4();
+  }, 60000);
+}
+
+let phase4Started = false;
+function startPhase4() {
+  console.log("phase4")
+  clearInterval(phase3Interval);
+  phase4Started = true;
+  phase = 4;
+
+  stopBullets = true;
+  lockPlayer = true;
+
+  showWarningText("You will die here.", () => {
+    
+    // Xoá toàn bộ đạn
+    bullets.length = 0;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    stopBullets = false;
+    lockPlayer = false;
+
+    // BOSS SHOOT = phase1 + phase2 chạy song song
+    startPhase4_Attacks();
+  });
+}
+
+function spawnPhase4Bomb() {
+  // --- Lấy vị trí player ---
+  const p = player.getBoundingClientRect();
+  const px = p.left + p.width / 2;
+  const py = p.top + p.height / 2;
+
+  // --- Sinh vị trí bom nhưng phải cách player ≥150px và ở nửa trên màn hình ---
+  let bx, by;
+  while (true) {
+    bx = Math.random() * (window.innerWidth - 50) + 25;
+    by = Math.random() * (window.innerHeight / 2 - 50) + 25; // Chỉ nửa trên
+    const d = Math.hypot(bx - px, by - py);
+    if (d >= 150) break;
+  }
+
+  // --- Tạo DOM bom ---
+  const bomb = document.createElement("div");
+  bomb.style.position = "absolute";
+  bomb.style.left = (bx - 12.5) + "px";
+  bomb.style.top = (by - 12.5) + "px";
+  bomb.style.width = "25px";
+  bomb.style.height = "25px";
+  bomb.style.borderRadius = "50%";
+  bomb.style.background = "red";
+  bomb.style.zIndex = "2000";
+  document.body.appendChild(bomb);
+
+  // --- Bom nổ sau 600ms ---
+  setTimeout(() => {
+    bomb.remove();
+    explodePhase4Bomb(bx, by);
+  }, 600);
+}
+
+function explodePhase4Bomb(cx, cy) {
+  const rings = 3;    // số vòng
+  const count = 50;   // số viên mỗi vòng
+
+  for (let r = 0; r < rings; r++) {
+    const spd = 0.6 + r * 0.3;
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 / count) * i + r * 0.15;
+      spawnBounceBullet(cx, cy, angle, spd);
+    }
+  }
+}
+
+let phase4Loop = null;
+
+function startPhase4_Attacks() {
+  phase4Loop = setInterval(() => {
+    if (phase !== 4) return;
+    // Spiral từ boss
+    setTimeout(() => {
+      if (spiralUpgraded) fireSpiral();
+      else fireSpiralOld();
+    }, 5000);
+
+    // Bom nổ từ xa
+    setTimeout(() => {
+      spawnPhase4Bomb();
+    }, 2500);
+
+  }, 5000);
+}
+
+/* ==============================
+     AUTO START PHASE 2 (30s)
+============================== */
+setTimeout(() => {
+  if (!phase2Started) startPhase2();
+}, 30000);
+
+updateBoss();
+</script>
+</html>
