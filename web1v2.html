@@ -40,13 +40,16 @@
 
 <script type="module">
 const url = new URL(location.href);
-const uid = url.searchParams.get("uid");
-const linkId = url.searchParams.get("link") || "1";
+const uid = (url.searchParams.get("uid") || "").trim();
+const linkId = (url.searchParams.get("link") || "1").trim();
+const token = (url.searchParams.get("token") || "").trim();
 
-if (!uid || !uid.trim()) {
-  alert("Không tìm thấy UID. Mở từ trong app!");
-  throw new Error("Missing UID");
+if (!uid || !linkId || !token) {
+  alert("Thiếu dữ liệu từ app (uid/link/token).");
+  throw new Error("Missing uid/link/token");
 }
+
+localStorage.setItem("luxta_token", token);
 
 const lNameEl = document.getElementById("l_name");
 const countText = document.getElementById("count");
@@ -54,12 +57,9 @@ const progressBar = document.querySelector("progress");
 const startBtn = document.querySelector(".start");
 
 lNameEl.textContent = "Link " + linkId;
-
-// KHÓA nút Start ban đầu
 startBtn.disabled = true;
 startBtn.style.opacity = 0.6;
 
-// Map tất cả link
 const linkMap = {
   "1": "https://link4m.com/NM0ghGn",
   "2": "https://link4m.com/rkjy6Yko",
@@ -84,52 +84,38 @@ const linkMap = {
 };
 const defaultLink = "https://link4m.co/default";
 
-// --- Gọi server để lấy token và số lần vượt hôm nay ---
-async function loadToken() {
+async function loadCount() {
   try {
-    const res = await fetch("https://render-backend-wnt8.onrender.com/get-token", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ uid, linkId })
-    });
-
+    const res = await fetch(
+      `https://render-backend-wnt8.onrender.com/public-link-check?uid=${encodeURIComponent(uid)}&linkId=${encodeURIComponent(linkId)}`
+    );
     const data = await res.json();
 
-    const count = data.countToday ?? 0;
+    const count = Number(data.countToday ?? 0);
     progressBar.value = count;
     countText.textContent = `${count}/2`;
 
-    if (count >= 2) {
-      startBtn.disabled = true;
-      startBtn.style.opacity = 0.6;
-    } else if (data.ok && data.token) {
-      localStorage.setItem("luxta_token", data.token);
-      startBtn.disabled = false;
-      startBtn.style.opacity = 1;
-    } else {
-      startBtn.disabled = false;
-      startBtn.style.opacity = 1;
-    }
+    const canStart = data.ok && count < 2;
+    startBtn.disabled = !canStart;
+    startBtn.style.opacity = canStart ? 1 : 0.6;
   } catch (err) {
-    console.error("Lỗi khi gọi server:", err);
+    console.error("PUBLIC LINK CHECK ERROR:", err);
     alert("Không kết nối được server, thử lại sau.");
   }
 }
 
-// Gọi lần đầu
-loadToken();
+loadCount();
 
-// Khi nhấn Start
 startBtn.addEventListener("click", () => {
-  const count = parseInt(progressBar.value) || 0;
+  const count = parseInt(progressBar.value, 10) || 0;
   if (count >= 2) {
     alert("Hôm nay bạn đã vượt đủ 2 lần của link này.");
     return;
   }
-
   const targetLink = linkMap[linkId] || defaultLink;
   window.open(targetLink, "_blank");
 });
 </script>
+
 </body>
 </html>
