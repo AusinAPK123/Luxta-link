@@ -43,13 +43,12 @@ const url = new URL(location.href);
 const uid = (url.searchParams.get("uid") || "").trim();
 const linkId = (url.searchParams.get("link") || "1").trim();
 const token = (url.searchParams.get("token") || "").trim();
+const countFromUrl = Number(url.searchParams.get("count") || 0);
 
 if (!uid || !linkId || !token) {
   alert("Thiếu dữ liệu từ app (uid/link/token).");
   throw new Error("Missing uid/link/token");
 }
-
-localStorage.setItem("luxta_token", token);
 
 const lNameEl = document.getElementById("l_name");
 const countText = document.getElementById("count");
@@ -57,8 +56,17 @@ const progressBar = document.querySelector("progress");
 const startBtn = document.querySelector(".start");
 
 lNameEl.textContent = "Link " + linkId;
-startBtn.disabled = true;
-startBtn.style.opacity = 0.6;
+
+let count = Number.isFinite(countFromUrl) ? countFromUrl : 0;
+count = Math.max(0, Math.min(2, count));
+progressBar.value = count;
+countText.textContent = `${count}/2`;
+
+function setCanStart(canStart) {
+  startBtn.disabled = !canStart;
+  startBtn.style.opacity = canStart ? 1 : 0.6;
+}
+setCanStart(count < 2);
 
 const linkMap = {
   "1": "https://link4m.com/NM0ghGn",
@@ -90,32 +98,34 @@ async function loadCount() {
       `https://render-backend-wnt8.onrender.com/public-link-check?uid=${encodeURIComponent(uid)}&linkId=${encodeURIComponent(linkId)}`
     );
     const data = await res.json();
+    if (!data.ok) return; // giữ fallback từ URL
 
-    const count = Number(data.countToday ?? 0);
+    const fresh = Number(data.countToday ?? count);
+    count = Math.max(0, Math.min(2, fresh));
     progressBar.value = count;
     countText.textContent = `${count}/2`;
-
-    const canStart = data.ok && count < 2;
-    startBtn.disabled = !canStart;
-    startBtn.style.opacity = canStart ? 1 : 0.6;
+    setCanStart(count < 2);
   } catch (err) {
     console.error("PUBLIC LINK CHECK ERROR:", err);
-    alert("Không kết nối được server, thử lại sau.");
+    // giữ fallback từ URL, không khóa nút
   }
 }
 
 loadCount();
 
 startBtn.addEventListener("click", () => {
-  const count = parseInt(progressBar.value, 10) || 0;
-  if (count >= 2) {
+  const current = parseInt(progressBar.value, 10) || 0;
+  if (current >= 2) {
     alert("Hôm nay bạn đã vượt đủ 2 lần của link này.");
     return;
   }
+
+  localStorage.setItem("luxta_token", token); // lưu khi thật sự bắt đầu
   const targetLink = linkMap[linkId] || defaultLink;
   window.open(targetLink, "_blank");
 });
 </script>
+
 
 </body>
 </html>
