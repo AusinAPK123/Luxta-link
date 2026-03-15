@@ -9,7 +9,7 @@
     font-family: 'Pixil';
     src: url('Pixil.otf') format('opentype');
   }
-  
+
   body {
     background:#111; color:white;
     display:flex; align-items:center; justify-content:center;
@@ -23,6 +23,7 @@
 
 </body>
 <script>
+  // --- lấy token từ URL hoặc localStorage ---
   const urlParams = new URLSearchParams(window.location.search);
   const token = urlParams.get("token") || localStorage.getItem("luxta_token");
 
@@ -37,6 +38,7 @@
 
     setTimeout(async () => {
       try {
+        // --- gửi request redeem token ---
         const redeemRes = await fetch(
           "https://render-backend-wnt8.onrender.com/use-token",
           {
@@ -48,11 +50,14 @@
 
         const redeemData = await redeemRes.json();
 
+        // ❌ server trả về lỗi hợp lệ → xoá token
         if (!redeemData.ok) {
           statusEl.innerText = redeemData.error || "Token không hợp lệ";
           localStorage.removeItem("luxta_token");
           return;
         }
+
+        // ✅ thành công → xoá token
         localStorage.removeItem("luxta_token");
 
         statusEl.innerText =
@@ -66,6 +71,7 @@
         }, 1200);
 
       } catch (err) {
+        // ⚠️ lỗi mạng / server chết → KHÔNG xoá token
         console.error(err);
         statusEl.innerText = "Không kết nối được server, vui lòng thử lại";
       }
