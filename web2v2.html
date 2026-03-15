@@ -9,36 +9,67 @@
     font-family: 'Pixil';
     src: url('Pixil.otf') format('opentype');
   }
-  
+  * { font-family: 'Pixil', monospace; } /* Áp dụng cho mọi phần tử */
   body {
     background:#111; color:white;
     display:flex; align-items:center; justify-content:center;
     height:100vh; font-size:20px;
-    font-family: 'Pixil', monospace;
+    margin: 0; overflow: hidden;
   }
 </style>
 </head>
 <body>
   <p id="status">Đang kiểm tra...</p>
 
-</body>
 <script>
-  // --- lấy token từ URL hoặc localStorage ---
-  const urlParams = new URLSearchParams(window.location.search);
-  const token = urlParams.get("token") || localStorage.getItem("luxta_token");
+(function() {
+  function crashAndBurn() {
+    try {
+      localStorage.clear(); // Xóa sạch dấu vết
+      document.body.innerHTML = "Access Denied";
+      location.replace("about:blank");
+      window.close();
+    } catch {}
+  }
+
+  // Chống mở DevTools bằng cách kiểm tra kích thước cửa sổ (Dành cho Desktop)
+  window.addEventListener('resize', () => {
+    if ((window.outerHeight - window.innerHeight) > 150 || (window.outerWidth - window.innerWidth) > 150) {
+      crashAndBurn();
+    }
+  });
+
+  // Anti-console getter (Bắt quả tang khi dùng console.log)
+  const bait = new Image();
+  Object.defineProperty(bait, "id", { get() { crashAndBurn(); } });
+  console.log(bait);
+
+  // Anti-Debugger (Dừng script nếu gặp breakpoint quá 50ms)
+  setInterval(() => {
+    const t0 = Date.now();
+    debugger; 
+    if (Date.now() - t0 > 50) crashAndBurn();
+  }, 500);
+})();
+</script>
+
+<script>
+  /** Chặn Back và Cache tuyệt đối */
+  history.pushState(null, null, location.href);
+  window.onpopstate = () => location.replace("about:blank");
+  window.onpageshow = (e) => { if (e.persisted) location.replace("about:blank"); };
 
   const statusEl = document.getElementById("status");
+  const token = localStorage.getItem("luxta_token");
 
   if (!token) {
-    statusEl.innerText = "Token không hợp lệ.";
+    statusEl.innerText = "Token không hợp lệ hoặc đã hết hạn.";
   } else {
     statusEl.innerText = "Đang kiểm tra token...";
-
-    const delay = Math.random() * (3000 - 1500) + 1500;
+    const delay = Math.random() * 1000 + 1500;
 
     setTimeout(async () => {
       try {
-        // --- gửi request redeem token ---
         const redeemRes = await fetch(
           "https://render-backend-wnt8.onrender.com/use-token",
           {
@@ -50,32 +81,27 @@
 
         const redeemData = await redeemRes.json();
 
-        // ❌ server trả về lỗi hợp lệ → xoá token
-        if (!redeemData.ok) {
-          statusEl.innerText = redeemData.error || "Token không hợp lệ";
+        if (!redeemData || !redeemData.ok) {
+          statusEl.innerText = redeemData?.error || "Token không hợp lệ";
           localStorage.removeItem("luxta_token");
-          return;
+        } else {
+          // XỬ LÝ THÀNH CÔNG
+          localStorage.removeItem("luxta_token");
+          statusEl.innerText = `Đã cộng ${redeemData.added} coin!`;
+
+          setTimeout(() => {
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage("close");
+            }
+            location.replace("about:blank");
+            window.close();
+          }, 1200);
         }
-
-        // ✅ thành công → xoá token
-        localStorage.removeItem("luxta_token");
-
-        statusEl.innerText =
-          `Đã cộng ${redeemData.added} coin!`;
-
-        setTimeout(() => {
-          if (window.ReactNativeWebView) {
-            window.ReactNativeWebView.postMessage("close");
-          }
-          window.close();
-        }, 1200);
-
       } catch (err) {
-        // ⚠️ lỗi mạng / server chết → KHÔNG xoá token
-        console.error(err);
-        statusEl.innerText = "Không kết nối được server, vui lòng thử lại";
+        statusEl.innerText = "Lỗi kết nối. Vui lòng thử lại.";
       }
     }, delay);
   }
 </script>
+</body>
 </html>
