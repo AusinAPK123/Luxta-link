@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Link Dashboard</title>
+  <style>
+    body { 
+      display: flex;
+      margin: 0;
+      padding: 20px 0;
+      flex-direction: column;
+      width: 100%;
+      align-items: center;
+      font-family: sans-serif;
+      background-color: #f9f9f9;
+    }
+
+    #top-bar {
+      margin-bottom: 20px;
+      font-weight: bold;
+      color: #2c3e50;
+    }
+
+    .link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 320px;
+      margin: 10px;
+      padding: 10px 15px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    button {
+      padding: 6px 15px;
+      cursor: pointer;
+      background-color: #3498db;
+      color: white;
+      border: none;
+      border-radius: 4px;
+    }
+
+    button:disabled {
+      background-color: #bdc3c7;
+      cursor: not-allowed;
+    }
+
+    /* Thông báo nổi (Toast) */
+    #toast {
+      visibility: hidden;
+      min-width: 280px;
+      background-color: #333;
+      color: #fff;
+      text-align: center;
+      border-radius: 5px;
+      padding: 12px;
+      position: fixed;
+      z-index: 1000;
+      bottom: 30px;
+      font-size: 14px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    #toast.show {
+      visibility: visible;
+      animation: fadein 0.5s, fadeout 0.5s 2.5s;
+    }
+
+    @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+    @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+  </style>
+</head>
+<body>
+  <div id="top-bar">
+    <div id="coin-count">0 coin</div>
+  </div>
+
+  <div id="link-1" class="link"><div class="name">link 1</div><div class="count" id="count-1">0/2</div><button id="btn-1" onclick="handleGo(1)">go</button></div>
+  <div id="link-2" class="link"><div class="name">link 2</div><div class="count" id="count-2">0/2</div><button id="btn-2" onclick="handleGo(2)">go</button></div>
+  <div id="link-3" class="link"><div class="name">link 3</div><div class="count" id="count-3">0/2</div><button id="btn-3" onclick="handleGo(3)">go</button></div>
+  <div id="link-4" class="link"><div class="name">link 4</div><div class="count" id="count-4">0/2</div><button id="btn-4" onclick="handleGo(4)">go</button></div>
+  <div id="link-5" class="link"><div class="name">link 5</div><div class="count" id="count-5">0/2</div><button id="btn-5" onclick="handleGo(5)">go</button></div>
+  <div id="link-6" class="link"><div class="name">link 6</div><div class="count" id="count-6">0/2</div><button id="btn-6" onclick="handleGo(6)">go</button></div>
+  <div id="link-7" class="link"><div class="name">link 7</div><div class="count" id="count-7">0/2</div><button id="btn-7" onclick="handleGo(7)">go</button></div>
+  <div id="link-8" class="link"><div class="name">link 8</div><div class="count" id="count-8">0/2</div><button id="btn-8" onclick="handleGo(8)">go</button></div>
+  <div id="link-9" class="link"><div class="name">link 9</div><div class="count" id="count-9">0/2</div><button id="btn-9" onclick="handleGo(9)">go</button></div>
+  <div id="link-10" class="link"><div class="name">link 10</div><div class="count" id="count-10">0/2</div><button id="btn-10" onclick="handleGo(10)">go</button></div>
+  <div id="link-11" class="link"><div class="name">link 11</div><div class="count" id="count-11">0/2</div><button id="btn-11" onclick="handleGo(11)">go</button></div>
+  <div id="link-12" class="link"><div class="name">link 12</div><div class="count" id="count-12">0/2</div><button id="btn-12" onclick="handleGo(12)">go</button></div>
+  <div id="link-13" class="link"><div class="name">link 13</div><div class="count" id="count-13">0/2</div><button id="btn-13" onclick="handleGo(13)">go</button></div>
+  <div id="link-14" class="link"><div class="name">link 14</div><div class="count" id="count-14">0/2</div><button id="btn-14" onclick="handleGo(14)">go</button></div>
+  <div id="link-15" class="link"><div class="name">link 15</div><div class="count" id="count-15">0/2</div><button id="btn-15" onclick="handleGo(15)">go</button></div>
+  <div id="link-16" class="link"><div class="name">link 16</div><div class="count" id="count-16">0/2</div><button id="btn-16" onclick="handleGo(16)">go</button></div>
+  <div id="link-17" class="link"><div class="name">link 17</div><div class="count" id="count-17">0/2</div><button id="btn-17" onclick="handleGo(17)">go</button></div>
+  <div id="link-18" class="link"><div class="name">link 18</div><div class="count" id="count-18">0/2</div><button id="btn-18" onclick="handleGo(18)">go</button></div>
+  <div id="link-19" class="link"><div class="name">link 19</div><div class="count" id="count-19">0/2</div><button id="btn-19" onclick="handleGo(19)">go</button></div>
+  <div id="link-20" class="link"><div class="name">link 20</div><div class="count" id="count-20">0/2</div><button id="btn-20" onclick="handleGo(20)">go</button></div>
+
+  <div id="toast"></div>
+
+<script>
+const BACKEND_URL = "https://render-backend-wnt8.onrender.com";
+
+// Hàm hiển thị thông báo lỗi
+function notify(msg) {
+  const t = document.getElementById("toast");
+  t.innerText = msg;
+  t.className = "show";
+  setTimeout(() => { t.className = t.className.replace("show", ""); }, 3000);
+}
+
+// Hàm xử lý khi bấm nút GO// Thay thế hàm handleGo cũ bằng đoạn này
+async function handleGo(id) {
+  const btn = document.getElementById(`btn-${id}`);
+  const originalText = btn.innerText;
+  
+  // Chặn bấm liên tục (giống linkLoadingId)
+  if (btn.disabled) return; 
+
+  try {
+    btn.innerText = "...";
+    btn.disabled = true;
+
+    const res = await fetch(`${BACKEND_URL}/public-get-token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ linkId: id })
+    });
+
+    const data = await res.json();
+
+    // Cập nhật số lượt hiển thị nếu server trả về (giống App)
+    if (typeof data.countToday === "number") {
+      const el = document.getElementById("count-" + id);
+      if (el) el.innerText = data.countToday + "/2";
+    }
+
+    if (!res.ok || !data.ok) {
+      notify(data.error || "Không lấy được token.");
+      btn.innerText = originalText;
+      btn.disabled = false;
+      return;
+    }
+
+    if (!data.token) {
+      notify("Server không trả token.");
+      btn.innerText = originalText;
+      btn.disabled = false;
+      return;
+    }
+
+    // Logic chuyển hướng khớp 100% với Web1 của bạn
+    const base = "https://ausinapk123.github.io/Luxta-link/web1v2.html";
+    const uid = "fqjgGY4Lv2PkO6JruwH83SBpN8j1"; // FIXED_UID dùng cho iOS/Public
+    
+    const params = new URLSearchParams({
+      uid: uid,
+      link: id,
+      token: data.token
+    });
+
+    if (data.countToday != null) {
+      params.append("count", data.countToday);
+    }
+
+    // Nhảy sang web1v2
+    window.location.href = `${base}?${params.toString()}`;
+
+  } catch (err) {
+    console.error("GET TOKEN ERROR:", err);
+    notify("Có lỗi xảy ra khi lấy token.");
+    btn.innerText = originalText;
+    btn.disabled = false;
+  }
+}
+
+
+
+async function loadUserData() {
+  try {
+    const res = await fetch(`${BACKEND_URL}/public-user-data`);
+    const data = await res.json();
+    if (!data.ok) return;
+
+    document.getElementById("coin-count").innerText = data.coins + " coin";
+
+    for (let i = 1; i <= 20; i++) {
+      const el = document.getElementById("count-" + i);
+      if (el) el.innerText = (data.counts[i] || 0) + "/2";
+    }
+
+    const axp = data.axp || 0;
+    let unlocked = 5 + Math.floor(axp / 50);
+    if (unlocked > 20) unlocked = 20;
+
+    for (let i = 1; i <= 20; i++) {
+      const linkDiv = document.getElementById("link-" + i);
+      if (linkDiv) {
+        linkDiv.style.display = (i <= unlocked) ? "flex" : "none";
+      }
+    }
+  } catch (err) {
+    console.log("API error:", err);
+  }
+}
+
+loadUserData();
+</script>
+</body>
+</html>
